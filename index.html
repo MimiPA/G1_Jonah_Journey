@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jonah's Journey to Nineveh - Coding Quest</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts for playful text -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Fredoka', cursive, sans-serif;
+      background: radial-gradient(circle at center, #1e1b4b 0%, #0f172a 100%);
+      color: #ffffff;
+      touch-action: manipulation;
+    }
+
+    /* Grid Cell Styling */
+    .grid-cell {
+      background: rgba(30, 41, 59, 0.75);
+      border: 2px solid rgba(139, 92, 246, 0.35);
+      box-shadow: inset 0 0 12px rgba(139, 92, 246, 0.15);
+      transition: all 0.3s ease;
+    }
+
+    .grid-cell.start-cell {
+      border-color: #10b981;
+      background: rgba(16, 185, 129, 0.2);
+    }
+
+    .grid-cell.target-cell {
+      border-color: #f59e0b;
+      background: rgba(245, 158, 11, 0.2);
+      box-shadow: 0 0 15px rgba(245, 158, 11, 0.35);
+    }
+
+    /* Floating Animation for Goal & Story Elements */
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) scale(1); }
+      50% { transform: translateY(-5px) scale(1.08); }
+    }
+
+    .animate-float {
+      animation: float 2.5s ease-in-out infinite;
+    }
+
+    /* Interactive Command Cards */
+    .command-card {
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .command-card:active {
+      transform: scale(0.92);
+    }
+
+    /* Step execution active highlight */
+    .step-active {
+      border: 3px solid #facc15 !important;
+      transform: scale(1.08);
+      box-shadow: 0 0 15px #facc15;
+    }
+
+    .step-error {
+      border: 3px solid #ef4444 !important;
+      background-color: rgba(239, 68, 68, 0.4) !important;
+      animation: shake 0.4s ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+
+    /* Confetti Overlay */
+    #confetti-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-2 sm:p-4 selection:bg-indigo-500 selection:text-white">
+
+  <!-- Confetti Canvas for Victory -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <!-- Navigation / Header -->
+  <header class="w-full max-w-5xl mx-auto bg-slate-900/80 backdrop-blur border border-indigo-500/30 rounded-2xl p-3 sm:p-4 mb-3 flex flex-wrap justify-between items-center gap-3 shadow-lg">
+    <div class="flex items-center gap-3">
+      <div class="text-3xl sm:text-4xl animate-bounce">🧔‍♂️</div>
+      <div>
+        <h1 class="text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-indigo-300">
+          Jonah's Journey to Nineveh
+        </h1>
+        <p class="text-xs sm:text-sm text-indigo-200">Help Jonah find the path to Nineveh and debug mistakes!</p>
+      </div>
+    </div>
+
+    <!-- Mode Selector & Controls -->
+    <div class="flex items-center gap-2 flex-wrap">
+      <button id="mode-free" onclick="switchMode('free')" class="px-3 py-1.5 text-xs sm:text-sm rounded-xl font-semibold bg-indigo-600 text-white shadow-md hover:bg-indigo-500 transition">
+        🎮 Free Play
+      </button>
+      <button id="mode-debug" onclick="switchMode('debug')" class="px-3 py-1.5 text-xs sm:text-sm rounded-xl font-semibold bg-slate-800 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-900/50 transition">
+        🛠️ Debug Challenge
+      </button>
+      <button id="sound-btn" onclick="toggleSound()" class="p-2 rounded-xl bg-slate-800 text-yellow-300 border border-slate-700 hover:bg-slate-700 transition" title="Toggle Sound">
+        🔊
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Game Layout -->
+  <main class="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4 items-start flex-1">
+    
+    <!-- Left Column: 4x4 Story Grid Board -->
+    <section class="lg:col-span-5 flex flex-col items-center w-full bg-slate-900/70 border border-indigo-500/30 rounded-3xl p-4 sm:p-6 shadow-xl">
+      
+      <!-- Mission Info Banner -->
+      <div id="mission-banner" class="w-full mb-4 bg-indigo-950/70 border border-indigo-500/30 rounded-2xl p-3 text-center">
+        <span class="text-xs text-amber-400 uppercase tracking-widest block font-bold">Mission Goal</span>
+        <span id="mission-text" class="text-sm sm:text-base font-semibold text-indigo-100">Guide Jonah from Hometown (0,0) to Nineveh 🏰! Avoid the 4 Jonah story bugs!</span>
+      </div>
+
+      <!-- 4x4 Grid Container -->
+      <div id="grid-container" class="grid grid-cols-4 grid-rows-4 gap-2 sm:gap-3 w-full aspect-square max-w-[340px] p-2 bg-slate-950/80 rounded-2xl border-2 border-indigo-500/50 shadow-2xl relative">
+        <!-- Cells generated dynamically by JS -->
+      </div>
+
+      <!-- Status & Coordinates Display -->
+      <div class="mt-4 flex items-center justify-between w-full text-xs sm:text-sm text-indigo-200 px-3 py-2 bg-slate-950/60 rounded-xl border border-slate-800">
+        <span>Facing: <strong id="facing-text" class="text-yellow-400">East ➡️</strong></span>
+        <span>Pos: <strong id="pos-text" class="text-amber-400">(0, 0)</strong></span>
+      </div>
+    </section>
+
+    <!-- Right Column: Command Builder & Sequence Track -->
+    <section class="lg:col-span-7 flex flex-col justify-between w-full h-full bg-slate-900/70 border border-indigo-500/30 rounded-3xl p-4 sm:p-6 shadow-xl gap-4">
+      
+      <!-- Command Palette / Buttons -->
+      <div>
+        <div class="flex justify-between items-center mb-2">
+          <h2 class="text-base sm:text-lg font-bold text-indigo-200 flex items-center gap-2">
+            <span>🧩 Command Palette</span>
+            <span class="text-xs font-normal text-slate-400">(Tap to add to code)</span>
+          </h2>
+        </div>
+
+        <!-- Touch-Friendly Command Grid -->
+        <div class="grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3">
+          <!-- Direction Buttons -->
+          <button onclick="addCommand('UP')" class="command-card bg-gradient-to-b from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-2.5 px-2 rounded-2xl shadow-md border-b-4 border-blue-900 flex flex-col items-center justify-center gap-1">
+            <span class="text-2xl">⬆️</span>
+            <span class="text-xs">Up</span>
+          </button>
+
+          <button onclick="addCommand('DOWN')" class="command-card bg-gradient-to-b from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-2.5 px-2 rounded-2xl shadow-md border-b-4 border-blue-900 flex flex-col items-center justify-center gap-1">
+            <span class="text-2xl">⬇️</span>
+            <span class="text-xs">Down</span>
+          </button>
+
+          <button onclick="addCommand('LEFT')" class="command-card bg-gradient-to-b from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-2.5 px-2 rounded-2xl shadow-md border-b-4 border-blue-900 flex flex-col items-center justify-center gap-1">
+            <span class="text-2xl">⬅️</span>
+            <span class="text-xs">Left</span>
+          </button>
+
+          <button onclick="addCommand('RIGHT')" class="command-card bg-gradient-to-b from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-2.5 px-2 rounded-2xl shadow-md border-b-4 border-blue-900 flex flex-col items-center justify-center gap-1">
+            <span class="text-2xl">➡️</span>
+            <span class="text-xs">Right</span>
+          </button>
+
+          <!-- Turning & Forward Controls -->
+          <button onclick="addCommand('TURN_LEFT')" class="command-card bg-gradient-to-b from-teal-600 to-teal-700 hover:from-teal-500 hover:to-teal-600 text-white font-bold py-2.5 px-2 rounded-2xl shadow-md border-b-4 border-teal-900 flex flex-col items-center justify-center gap-1">
+            <span class="text-2xl">↩️</span>
+            <span class="text-xs">Turn Left</span>
+          </button>
+
+          <button onclick="addCommand('TURN_RIGHT')" class="command-card bg-gradient-to-b from-teal-600 to-teal-700 hover:from-teal-500 hover:to-teal-600 text-white font-bold py-2.5 px-2 rounded-2xl shadow-md border-b-4 border-teal-900 flex flex-col items-center justify-center gap-1">
+            <span class="text-2xl">↪️</span>
+            <span class="text-xs">Turn Right</span>
+          </button>
+
+          <button onclick="addCommand('FORWARD')" class="command-card bg-gradient-to-b from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold py-2.5 px-2 rounded-2xl shadow-md border-b-4 border-amber-900 flex flex-col items-center justify-center gap-1 col-span-2 sm:col-span-2">
+            <span class="text-2xl">👟</span>
+            <span class="text-xs">Move Forward</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Command Queue Track -->
+      <div class="flex-1 flex flex-col justify-between">
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <h3 class="text-sm font-bold text-indigo-200 flex items-center gap-2">
+              <span>📜 Jonah's Code Path</span>
+              <span id="step-count" class="text-xs px-2 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-700">0 steps</span>
+            </h3>
+            <div class="flex gap-2">
+              <button onclick="deleteLastCommand()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-xl transition flex items-center gap-1" title="Undo last command">
+                <span>⌫</span> Undo
+              </button>
+              <button onclick="clearCommands()" class="text-xs bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-800 px-2.5 py-1 rounded-xl transition flex items-center gap-1" title="Clear all commands">
+                <span>🗑️</span> Clear
+              </button>
+            </div>
+          </div>
+
+          <!-- Command Cards Sequence Container -->
+          <div id="command-queue" class="min-h-[90px] max-h-[140px] overflow-x-auto p-3 bg-slate-950/90 rounded-2xl border border-slate-800 flex items-center gap-2.5">
+            <p id="empty-queue-msg" class="text-xs text-slate-500 italic mx-auto">Tap the command buttons above to create Jonah's route!</p>
+          </div>
+        </div>
+
+        <!-- Run & Reset Buttons -->
+        <div class="mt-4 flex gap-3">
+          <button id="run-btn" onclick="runProgram()" class="flex-1 bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 hover:from-emerald-400 hover:to-green-400 text-white font-extrabold text-lg py-3.5 px-4 rounded-2xl shadow-lg shadow-emerald-950/50 border-b-4 border-emerald-800 transition transform active:scale-98 flex items-center justify-center gap-2">
+            <span>🚀 RUN PROGRAM</span>
+          </button>
+
+          <button id="reset-btn" onclick="resetJonah()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-4 rounded-2xl border-b-4 border-slate-950 transition flex items-center justify-center gap-1">
+            <span>🔄 Reset</span>
+          </button>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Debug Prompt / Story Bug Collision Modal -->
+  <div id="debug-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-slate-900 border-2 border-rose-500/60 rounded-3xl p-6 max-w-md w-full text-center shadow-2xl relative animate-shake">
+      <div id="debug-icon" class="text-5xl mb-3 animate-bounce">🌩️💥</div>
+      <h3 id="debug-title" class="text-2xl font-bold text-rose-400 mb-2">Story Bug Encountered!</h3>
+      <p id="debug-message" class="text-sm text-slate-300 mb-4 leading-relaxed">
+        Jonah ran into a story mistake. Look at your highlighted code block to see where he got off track!
+      </p>
+
+      <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 mb-5 text-xs text-indigo-300 text-left">
+        <strong>💡 Debugging Advice:</strong>
+        <p id="debug-tip" class="mt-1 text-slate-400">Jonah will return to his Hometown so you can fix the step!</p>
+      </div>
+
+      <div class="flex gap-3">
+        <button onclick="closeDebugModal()" class="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 rounded-2xl shadow-md border-b-4 border-indigo-900">
+          🛠️ Redo & Fix Code
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mission Success Celebration Modal -->
+  <div id="success-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-900 border-2 border-amber-400/80 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl relative">
+      <div class="text-6xl mb-3 animate-bounce">🏰🎉</div>
+      <h3 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 mb-2">
+        Jonah Reached Nineveh!
+      </h3>
+      <p class="text-base text-indigo-200 mb-4">
+        Awesome coding! You successfully navigated Jonah to Nineveh without running into any story bugs!
+      </p>
+      <div class="text-3xl mb-6">⭐⭐⭐</div>
+
+      <div class="flex flex-col gap-2">
+        <button onclick="closeSuccessModal(); switchMode('debug');" class="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-extrabold text-lg py-3 rounded-2xl shadow-lg border-b-4 border-amber-700">
+          🎮 Try Debug Challenge!
+        </button>
+        <button onclick="closeSuccessModal(); resetJonah();" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-2xl border border-slate-700">
+          🔄 Play Again
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer Info -->
+  <footer class="w-full max-w-5xl mx-auto text-center text-xs text-slate-500 py-2 mt-2">
+    Jonah's Journey Coding Quest • STEM & Story Learning Tool
+  </footer>
+
+  <!-- JavaScript Logic -->
+  <script>
+    /* ==========================================================================
+       1. GAME CONFIGURATION & STATE
+       ========================================================================== */
+    const GRID_SIZE = 4;
+    
+    // Headings: 0: North ⬆️, 1: East ➡️, 2: South ⬇️, 3: West ⬅️
+    const DIRECTIONS = ['NORTH', 'EAST', 'SOUTH', 'WEST'];
+    const DIRECTION_EMOJIS = { NORTH: '⬆️', EAST: '➡️', SOUTH: '⬇️', WEST: '⬅️' };
+    const DIRECTION_DEGREES = { NORTH: 0, EAST: 90, SOUTH: 180, WEST: 270 };
+
+    // Initial game layout positions (0-indexed row, col)
+    let state = {
+      jonah: { row: 0, col: 0, dirIndex: 1 }, // Starts facing East at Hometown
+      target: { row: 3, col: 3 },             // Nineveh
+      hazards: [
+        { row: 0, col: 2, type: 'SLEEP', icon: '🛌', name: 'Sleeping in Ship', desc: 'Jonah fell asleep while fleeing on the ship!' },
+        { row: 1, col: 3, type: 'STORM', icon: '🌩️', name: 'Big Storm', desc: 'A fierce sea tempest hit the ship!' },
+        { row: 2, col: 1, type: 'FISH', icon: '🐋', name: 'Eaten by Big Fish', desc: 'Jonah was swallowed by the giant fish!' },
+        { row: 3, col: 0, type: 'LAND', icon: '🏜️', name: 'Desert Shore', desc: 'Jonah landed on dry land away from Nineveh!' }
+      ],
+      commands: [],
+      isRunning: false,
+      soundEnabled: true,
+      currentMode: 'free'
+    };
+
+    // Web Audio Synthesizer
+    let audioCtx = null;
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    function playSound(type) {
+      if (!state.soundEnabled) return;
+      try {
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+
+        if (type === 'click') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(420, now);
+          osc.frequency.exponentialRampToValueAtTime(750, now + 0.05);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
+          osc.start(now);
+          osc.stop(now + 0.05);
+        } else if (type === 'step') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(280, now);
+          osc.frequency.exponentialRampToValueAtTime(480, now + 0.08);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        } else if (type === 'error') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(200, now);
+          osc.frequency.setValueAtTime(130, now + 0.12);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        } else if (type === 'win') {
+          const notes = [523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, idx) => {
+            const noteOsc = audioCtx.createOscillator();
+            const noteGain = audioCtx.createGain();
+            noteOsc.connect(noteGain);
+            noteGain.connect(audioCtx.destination);
+            noteOsc.type = 'sine';
+            noteOsc.frequency.setValueAtTime(freq, now + idx * 0.1);
+            noteGain.gain.setValueAtTime(0.2, now + idx * 0.1);
+            noteGain.gain.linearRampToValueAtTime(0.01, now + idx * 0.1 + 0.25);
+            noteOsc.start(now + idx * 0.1);
+            noteOsc.stop(now + idx * 0.1 + 0.25);
+          });
+        }
+      } catch (e) {
+        console.log('Audio playback prevented or unsupported');
+      }
+    }
+
+    function toggleSound() {
+      state.soundEnabled = !state.soundEnabled;
+      document.getElementById('sound-btn').innerText = state.soundEnabled ? '🔊' : '🔇';
+    }
+
+    /* ==========================================================================
+       2. GRID BOARD RENDERING
+       ========================================================================== */
+    function renderGrid() {
+      const container = document.getElementById('grid-container');
+      container.innerHTML = '';
+
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          const cell = document.createElement('div');
+          cell.id = `cell-${r}-${c}`;
+          cell.className = `grid-cell rounded-xl flex items-center justify-center relative select-none`;
+
+          const isStart = (r === 0 && c === 0);
+          const isTarget = (r === state.target.row && c === state.target.col);
+          const hazard = state.hazards.find(h => h.row === r && h.col === c);
+          const isJonah = (r === state.jonah.row && c === state.jonah.col);
+
+          if (isStart) cell.classList.add('start-cell');
+          if (isTarget) cell.classList.add('target-cell');
+
+          let contentHTML = '';
+
+          if (isTarget) {
+            contentHTML += `<span class="text-3xl sm:text-4xl animate-float" title="Nineveh">🏰</span>`;
+          } else if (hazard) {
+            contentHTML += `<span class="text-2xl sm:text-3xl animate-pulse" title="${hazard.name}">${hazard.icon}</span>`;
+          } else if (isStart && !isJonah) {
+            contentHTML += `<span class="text-xs text-emerald-400 font-bold opacity-60">HOME</span>`;
+          }
+
+          // Render Jonah sprite
+          if (isJonah) {
+            const rotationDeg = DIRECTION_DEGREES[DIRECTIONS[state.jonah.dirIndex]];
+            contentHTML = `
+              <div class="relative flex items-center justify-center transition-all duration-300" style="transform: rotate(${rotationDeg}deg);">
+                <span class="text-3xl sm:text-4xl filter drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]">🧔‍♂️</span>
+              </div>
+            `;
+          }
+
+          cell.innerHTML = contentHTML;
+          container.appendChild(cell);
+        }
+      }
+
+      // Update Info Panel
+      document.getElementById('facing-text').innerHTML = `${DIRECTIONS[state.jonah.dirIndex]} ${DIRECTION_EMOJIS[DIRECTIONS[state.jonah.dirIndex]]}`;
+      document.getElementById('pos-text').innerText = `(${state.jonah.row}, ${state.jonah.col})`;
+    }
+
+    /* ==========================================================================
+       3. COMMAND QUEUE ENGINE
+       ========================================================================== */
+    const COMMAND_META = {
+      'UP': { label: 'Up', emoji: '⬆️', color: 'bg-blue-600 border-blue-400' },
+      'DOWN': { label: 'Down', emoji: '⬇️', color: 'bg-blue-600 border-blue-400' },
+      'LEFT': { label: 'Left', emoji: '⬅️', color: 'bg-blue-600 border-blue-400' },
+      'RIGHT': { label: 'Right', emoji: '➡️', color: 'bg-blue-600 border-blue-400' },
+      'TURN_LEFT': { label: 'Turn L', emoji: '↩️', color: 'bg-teal-600 border-teal-400' },
+      'TURN_RIGHT': { label: 'Turn R', emoji: '↪️', color: 'bg-teal-600 border-teal-400' },
+      'FORWARD': { label: 'Forward', emoji: '👟', color: 'bg-amber-600 border-amber-400' }
+    };
+
+    function addCommand(type) {
+      if (state.isRunning) return;
+      if (state.commands.length >= 12) {
+        alert("Path limit reached! Try running your code or clearing steps.");
+        return;
+      }
+      playSound('click');
+      state.commands.push(type);
+      renderCommandQueue();
+    }
+
+    function deleteLastCommand() {
+      if (state.isRunning || state.commands.length === 0) return;
+      playSound('click');
+      state.commands.pop();
+      renderCommandQueue();
+    }
+
+    function clearCommands() {
+      if (state.isRunning) return;
+      playSound('click');
+      state.commands = [];
+      renderCommandQueue();
+    }
+
+    function renderCommandQueue() {
+      const container = document.getElementById('command-queue');
+      const stepCountEl = document.getElementById('step-count');
+      stepCountEl.innerText = `${state.commands.length} step${state.commands.length === 1 ? '' : 's'}`;
+
+      if (state.commands.length === 0) {
+        container.innerHTML = `<p id="empty-queue-msg" class="text-xs text-slate-500 italic mx-auto">Tap the command buttons above to create Jonah's route!</p>`;
+        return;
+      }
+
+      container.innerHTML = state.commands.map((cmdKey, index) => {
+        const meta = COMMAND_META[cmdKey];
+        return `
+          <div id="cmd-card-${index}" onclick="removeCommandAtIndex(${index})" class="flex-shrink-0 ${meta.color} text-white border-2 rounded-xl px-2.5 py-1.5 flex items-center gap-1.5 shadow-md cursor-pointer hover:opacity-80 transition" title="Step ${index + 1}: Tap to delete">
+            <span class="text-xs font-bold opacity-75">#${index + 1}</span>
+            <span class="text-base">${meta.emoji}</span>
+            <span class="text-xs font-semibold">${meta.label}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function removeCommandAtIndex(idx) {
+      if (state.isRunning) return;
+      playSound('click');
+      state.commands.splice(idx, 1);
+      renderCommandQueue();
+    }
+
+    /* ==========================================================================
+       4. PROGRAM EXECUTION & RESTART MECHANICS
+       ========================================================================== */
+    async function runProgram() {
+      if (state.isRunning) return;
+      if (state.commands.length === 0) {
+        alert("Please add at least one command before running!");
+        return;
+      }
+
+      state.isRunning = true;
+      toggleControls(false);
+
+      // Reset to start before stepping through code
+      resetJonah(false);
+
+      let stepIndex = 0;
+
+      for (stepIndex = 0; stepIndex < state.commands.length; stepIndex++) {
+        highlightStepCard(stepIndex, 'step-active');
+        playSound('step');
+
+        const cmd = state.commands[stepIndex];
+        const stepResult = executeSingleCommand(cmd);
+
+        renderGrid();
+
+        // Step pause timing
+        await new Promise(res => setTimeout(res, 650));
+
+        highlightStepCard(stepIndex, '');
+
+        if (!stepResult.success) {
+          highlightStepCard(stepIndex, 'step-error');
+          playSound('error');
+          showDebugModal(stepIndex, stepResult);
+          break;
+        }
+
+        // Check Victory
+        if (state.jonah.row === state.target.row && state.jonah.col === state.target.col) {
+          playSound('win');
+          triggerConfetti();
+          showSuccessModal();
+          break;
+        }
+      }
+
+      state.isRunning = false;
+      toggleControls(true);
+    }
+
+    function executeSingleCommand(cmd) {
+      let { row, col, dirIndex } = state.jonah;
+
+      if (cmd === 'UP') {
+        row--;
+        dirIndex = 0;
+      } else if (cmd === 'DOWN') {
+        row++;
+        dirIndex = 2;
+      } else if (cmd === 'LEFT') {
+        col--;
+        dirIndex = 3;
+      } else if (cmd === 'RIGHT') {
+        col++;
+        dirIndex = 1;
+      } else if (cmd === 'TURN_LEFT') {
+        dirIndex = (dirIndex + 3) % 4;
+      } else if (cmd === 'TURN_RIGHT') {
+        dirIndex = (dirIndex + 1) % 4;
+      } else if (cmd === 'FORWARD') {
+        const heading = DIRECTIONS[dirIndex];
+        if (heading === 'NORTH') row--;
+        if (heading === 'EAST') col++;
+        if (heading === 'SOUTH') row++;
+        if (heading === 'WEST') col--;
+      }
+
+      // Bounds Check
+      if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) {
+        return { success: false, reason: 'out-of-bounds' };
+      }
+
+      // Hazard Check
+      const hazardHit = state.hazards.find(h => h.row === row && h.col === col);
+      if (hazardHit) {
+        return { 
+          success: false, 
+          reason: 'hazard', 
+          hazardName: hazardHit.name, 
+          hazardIcon: hazardHit.icon,
+          hazardDesc: hazardHit.desc 
+        };
+      }
+
+      state.jonah.row = row;
+      state.jonah.col = col;
+      state.jonah.dirIndex = dirIndex;
+
+      return { success: true };
+    }
+
+    function highlightStepCard(index, className) {
+      const card = document.getElementById(`cmd-card-${index}`);
+      if (!card) return;
+      card.className = card.className.replace(/step-active|step-error/g, '').trim();
+      if (className) card.classList.add(className);
+    }
+
+    function resetJonah(render = true) {
+      state.jonah = { row: 0, col: 0, dirIndex: 1 }; // Row 0, Col 0, Facing East
+      if (render) renderGrid();
+    }
+
+    function toggleControls(enabled) {
+      const runBtn = document.getElementById('run-btn');
+      runBtn.disabled = !enabled;
+      runBtn.style.opacity = enabled ? '1' : '0.5';
+    }
+
+    /* ==========================================================================
+       5. MODALS & DEBUGGING FEEDBACK
+       ========================================================================== */
+    function showDebugModal(stepIdx, errorObj) {
+      const modal = document.getElementById('debug-modal');
+      const iconEl = document.getElementById('debug-icon');
+      const msgEl = document.getElementById('debug-message');
+      const tipEl = document.getElementById('debug-tip');
+
+      if (errorObj.reason === 'out-of-bounds') {
+        iconEl.innerText = '⚠️🧭';
+        msgEl.innerText = `Step #${stepIdx + 1} made Jonah wander off the grid border!`;
+        tipEl.innerHTML = `Step #${stepIdx + 1} went outside the 4x4 map. Turn or stop before reaching the edge!`;
+      } else {
+        iconEl.innerText = `${errorObj.hazardIcon}💥`;
+        msgEl.innerText = `Step #${stepIdx + 1}: Jonah ran into "${errorObj.hazardName}"! (${errorObj.hazardDesc})`;
+        tipEl.innerHTML = `Look at step #${stepIdx + 1}. Try changing that command or steering around the bug!`;
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeDebugModal() {
+      document.getElementById('debug-modal').classList.add('hidden');
+      resetJonah(); // Resets to start per requirements
+    }
+
+    function showSuccessModal() {
+      document.getElementById('success-modal').classList.remove('hidden');
+    }
+
+    function closeSuccessModal() {
+      document.getElementById('success-modal').classList.add('hidden');
+    }
+
+    /* ==========================================================================
+       6. MODES & DEBUGGING PRACTICE
+       ========================================================================== */
+    function switchMode(mode) {
+      state.currentMode = mode;
+      const freeBtn = document.getElementById('mode-free');
+      const debugBtn = document.getElementById('mode-debug');
+      const missionText = document.getElementById('mission-text');
+
+      if (mode === 'free') {
+        freeBtn.className = "px-3 py-1.5 text-xs sm:text-sm rounded-xl font-semibold bg-indigo-600 text-white shadow-md hover:bg-indigo-500 transition";
+        debugBtn.className = "px-3 py-1.5 text-xs sm:text-sm rounded-xl font-semibold bg-slate-800 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-900/50 transition";
+        missionText.innerText = "Guide Jonah from Hometown (0,0) to Nineveh 🏰! Avoid the 4 story bugs!";
+        clearCommands();
+        resetJonah();
+      } else {
+        debugBtn.className = "px-3 py-1.5 text-xs sm:text-sm rounded-xl font-semibold bg-indigo-600 text-white shadow-md hover:bg-indigo-500 transition";
+        freeBtn.className = "px-3 py-1.5 text-xs sm:text-sm rounded-xl font-semibold bg-slate-800 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-900/50 transition";
+        missionText.innerText = "🛠️ Debug Challenge: This pre-built path hits the Sleeping Ship bug! Fix the steps!";
+        loadDebugChallenge();
+      }
+    }
+
+    function loadDebugChallenge() {
+      resetJonah();
+      // Buggy sequence: Moves right twice directly into Sleeping Ship (0,2)
+      state.commands = ['RIGHT', 'RIGHT', 'DOWN', 'DOWN', 'DOWN', 'RIGHT'];
+      renderCommandQueue();
+    }
+
+    /* ==========================================================================
+       7. CONFETTI ANIMATION ENGINE
+       ========================================================================== */
+    function triggerConfetti() {
+      const canvas = document.getElementById('confetti-canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const particles = [];
+      const colors = ['#f59e0b', '#10b981', '#6366f1', '#ec4899', '#3b82f6'];
+
+      for (let i = 0; i < 90; i++) {
+        particles.push({
+          x: canvas.width / 2,
+          y: canvas.height / 2,
+          vx: (Math.random() - 0.5) * 12,
+          vy: (Math.random() - 0.7) * 12,
+          size: Math.random() * 8 + 4,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rotation: Math.random() * 360,
+          vRot: (Math.random() - 0.5) * 10
+        });
+      }
+
+      let animationFrame;
+      let duration = 0;
+
+      function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach((p) => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.2;
+          p.rotation += p.vRot;
+
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate((p.rotation * Math.PI) / 180);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+          ctx.restore();
+        });
+
+        duration++;
+        if (duration < 150) {
+          animationFrame = requestAnimationFrame(render);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          cancelAnimationFrame(animationFrame);
+        }
+      }
+
+      render();
+    }
+
+    /* Initialize on window load */
+    window.onload = () => {
+      renderGrid();
+      renderCommandQueue();
+    };
+  </script>
+</body>
+</html>
